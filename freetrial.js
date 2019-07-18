@@ -11,6 +11,7 @@ const utagImpVars = [
 	"page_name",
 	"customer_segment",
 	"geo",
+	"stack",
 	"sc_event",
 	"flow_type",
 	"offer_name",
@@ -29,6 +30,7 @@ const adobeImpVars = [
 	"events", 
 	"products", 
 	"mid", "c11", 
+	"v12",
 	"v65", "c35", 
 	"v35", "v54", 
 	"v60", 
@@ -38,7 +40,7 @@ const adobeImpVars = [
 const autofill = "https://www.ancestrycdn.com/mars/landing/tao-playground/autofills/universal-autofill-1.2.7.js";
 var utagResults = [];
 var adobeResults = [];
-var currentPage = "https://www.ancestry.com/cs/ancestry-family?stay"; // Always updates to the current page, for error logs.
+var currentPage = "https://www.ancestry.com/cs/ancestry-family?stay&tealium=stage"; // Always updates to the current page, for error logs.
 
 
 /*async function getPic() {
@@ -97,7 +99,9 @@ let scrape = async () => {
 		page.on('request', req => {
 		   	// Listen for any Adobe request containing "b/ss"
 		    if (req.url().indexOf("b/ss") > -1 ) {
-		    	var params = decodeURIComponent(req.url()).split("&")
+		    	// Check if they have POST data
+		    	var post = req.postData();
+		    	var params = decodeURIComponent( (post ? post : req.url()) ).split("&")
 		    	//Console.log( params );
 		    	var param, row = {}; //Array(adobeImpVars.length + 1)
 		        
@@ -112,15 +116,17 @@ let scrape = async () => {
 		        adobeResults.push(row);  
 		    }
 
+
 		    req.continue();
 		});
 	}
 
-	async function grabUtagData() {
+	async function grabUtagData(retries) {
 		// Update currentPage for error referencing
 		currentPage = await page.evaluate( () => {
 			return document.location.href
 		});
+		await page.waitForFunction('typeof utag != "undefined"');
 		// Grab utag.data from page
 		await page.evaluate( () => {
 			return utag.data;
@@ -141,6 +147,13 @@ let scrape = async () => {
 			Console.log("Grabbed utag data" + ( typeof d["pagename"] != 'undefined' ? " at [" + d["page_name"] + "]" : ""));
 			utagResults.push( d );
 		});
+		// .catch((err) => {
+		// 	if (retries != 0 ) {
+		// 		Console.log("Waiting for utag to populate...");
+		// 		await page.waitFor(delay);
+		// 		await grabUtagData(retries - 1);
+		// 	} else throw err;
+		// })
 	}
 
 	// clickForm( config )
@@ -181,15 +194,13 @@ let scrape = async () => {
 
 	// EDIT FLOW HERE
 	// Start up the browser
-	await page.setViewport({width: 900, height: 600});
+	await page.setViewport({width: 900, height: 800});
 
 	// Turn on Adobe grabbing.
 	await grabAdobeData();
 
 	// Start on landing page
 	await page.goto(currentPage, {waitUntil: 'networkidle0'});
-	// await page.waitFor(delay);
-	//utagResults.push( await page.evaluate( grabUtagData ));
 	await grabUtagData();
 
 	// Click on "Start my free trial" button;
@@ -197,7 +208,6 @@ let scrape = async () => {
 		  page.click('a[href*="/secure/login"]'),
 		  page.waitForNavigation({timeout: navTimeout})
 		]);
-	await page.waitFor(delay);
 	await grabUtagData();
 
 	// Autofill the Create Account page.
@@ -215,9 +225,7 @@ let scrape = async () => {
 	});
 	
 	// Click "Start Free Trial" in /cs/offers/freetrial
-	await page.waitFor(delay);
 	await grabUtagData();
-	await page.waitFor(delay);
 	await clickForm({ 
 		selector: "#offerGrid .ctaBox input", 
 		timeout: navTimeout, 
@@ -226,40 +234,35 @@ let scrape = async () => {
 	});
 
 	// Autofill MLI Checkout page
-	await page.waitFor(delay * 3); // Checkout page takes a long time to load.
 	await grabUtagData();
 	await page.addScriptTag({ url: autofill });
-	//await page.click(".paymentContainer button[type='submit']");
-	// await clickForm({ 
-	// 	selector: "button[type='submit']", 
-	// 	timeout: navTimeout, 
-	// 	autofill: true,
-	// 	retrys: 4
-	// });	
+	await page.click(".paymentContainer button[type='submit']");
 
-	var noAlerts = true;
-	while( noAlerts ) {
-		await page.click("button[type='submit']");
-		Console.log("Pending checkout click...");
-		await page.waitFor(navTimeout);
-		noAlerts = await page.evaluate(() => {return jQuery(".alert").length == -1});
-	}
-	
+	// Wait for Order now button to appear
+	await page.waitForFunction( () => {
+		return jQuery('.page[data-test=\'order-wrapper\'] button[type=\'submit\']').length > 0;
+	});
 
-	// await page.evaluate(() => {
-	// 	jQuery(".alert").length > 0 ? Console.error(jQuery(".alert").text()) : "";
-	// });
-	await page.waitFor(delay);
+	// Click Order now button, then wait for next page
+	// Sometimes an alert blocks the navigation. This happens randomly.
+	await Promise.all([
+		  page.click("button[type='submit']"),
+		  page.waitForNavigation({timeout: navTimeout})
+		]).catch( async (err) => {
+			var alert = await page.evaluate(() => {
+				return jQuery(".alert").text();
+			});
+			Console.error(alert);
+			throw(err);
+		});
 	await grabUtagData();
-	
+	await page.waitForFunction('sx.events.indexOf("purchase") > -1');
 	await browser.close();
   	return;
 };
 
 scrape().then(() => {
-    //console.log(value); // Success!
     console.log("Successfully scrapped data!");
-    //console.log(adobeResults);
     writeToSpreadsheet();
 
 }).catch((err) => {
