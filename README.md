@@ -6,9 +6,9 @@ REQUIREMENTS
 
 THEN
 1. Clone / download this repository to your computer
-2. > npm init ? I think?
+2. > npm update ? I think?
 3. Adjust config settings at top of freetrial.js
-3. > node freetrial.js 
+3. > node freetrial.js
 
 This should run a open a new browser window that automatically walks through the checkout process - up to the point where an alert appears, as it did when I last ran it 6/30/2019 7pm.
 
