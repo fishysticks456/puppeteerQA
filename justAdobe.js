@@ -9,14 +9,15 @@ const Console = require('console'); // Outputting to console
 const readline = require('readline'); // Reading keyboard inputs on console
 const chalk = require('chalk'); // Command prompt styling and colors
 const inquirer = require('inquirer'); // Command line interface that asks questions and parses input 
+const inBrowser = require('./browserJS.js'); // Script to execute within browser context.
 
 // EDIT CONFIGURATION HERE --------------
 const browserWidth = 1100;
 const browserHeight = 800;
-const showUtag = true;  	// Set to false to suppress utag_data on console.
+const showUtag = false;  	// Set to false to suppress utag_data on console.
 const showAdobe = true; 	// Set to false to suppress Adobe on console.
-const showDigitalData = true; 	// Set to false to suppress digitalData on console.
-const generatePrompt = true; // Set to false to turn off the starting prompt
+const showDigitalData = false; 	// Set to false to suppress digitalData on console.
+const generatePrompt = false; // Set to false to turn off the starting prompt
 const utagImpVars = [
 	"page_name",
 	"geo",
@@ -71,7 +72,7 @@ const qa_environments = {
 const qa_env = Object.keys(qa_environments)
 
 var tealium_env = ["prod", "qa", "dev"]; // "prod", "stage", or "dev"
-var startPage = "https://www.williams-sonoma.com/";
+var startPage = "https://tags.tiqcdn.com/utag/wsi/ios-registry-app/qa/mobile.html";
 var currentPage = "https://www.williams-sonoma.com/";
 
 const envQuestions = [
@@ -118,7 +119,7 @@ let roam = async () => {
 		        	param = params[i].split("=");
 		        	row[param[0]] = decodeURIComponent(param[1]);
 		        	if( adobeImpVars.includes(param[0]) ) {
-		        		impAValues[param[0]] = decodeURIComponent(param[1]);
+		        		impAValues[param[0]] = param[1];
 		        	}
 		        }
 		        var reg = RegExp(/\/b\/ss\/([^\/]*)\//g);
@@ -130,8 +131,7 @@ let roam = async () => {
 		        //row["Full Request"] = req.url();
 		        adobeResults.push(row);  
 
-		        // Grab utag_data
-		        await grabUtagData();
+		      
 
 		    // Listen for Mixpanel requests containing "?data"
 		    } 
@@ -140,102 +140,6 @@ let roam = async () => {
 		});
 	}
 
-	async function grabUtagData() {
-		// Update startPage for error referencing
-		currentPage = await page.evaluate( () => {
-			return document.location.href
-		}).catch((err) => {
-			Console.error(err);
-			return;
-		});
-		await page.waitForFunction('typeof digitalData != "undefined"');
-		await page.waitForFunction('typeof utag != "undefined"');
-		// Grab utag_data from page
-		await page.evaluate( () => {
-			return utag_data;
-		}).then((data) => {
-			// Only print out the important utag_data variables
-			var impVars = {};
-			for(var d in data) {
-				if(  utagImpVars.includes(d) ) {
-					impVars[d] = data[d];
-				}
-				// If data's data is an object, stringify it to show on excel.
-				if( typeof data[d] === 'object') data[d] = JSON.stringify(data[d]);
-			}
-			// Add on full 
-			//row["Full utag_data"] = JSON.stringify(data);
-			utagResults.push( data );
-			if( showUtag ) {
-				Console.log(chalk.bgCyan("utag_data"));
-				Console.log(impVars);
-			}
-			//Console.log("Grabbed utag data" + ( typeof d["pagename"] != 'undefined' ? " at [" + d["page_name"] + "]" : ""));
-		}).catch( err => {
-        	Console.log("Couldn't grab utag_data on " + currentPage);
-        	Console.error(err);	
-        });;
-
-        // Grab digitalData from page
-		await page.evaluate( () => {
-			return digitalData;
-		}).then((data) => {
-			// Only print out the important utag_data variables
-			var impVars = {};
-			for(var d in data) {
-				if(  digitalDataImpVars.includes(d) ) {
-					impVars[d] = data[d];
-				}
-				// If data's data is an object, stringify it to show on excel.
-				if( typeof data[d] === 'object') data[d] = JSON.stringify(data[d]);
-			}
-			// Add on full 
-			//row["Full utag_data"] = JSON.stringify(data);
-			digitalDataResults.push( data );
-			if( showDigitalData ) {
-				Console.log(chalk.bgCyan("digitalData"));
-				Console.log(impVars);
-			}
-			
-		}).catch( err => {
-        	Console.log("Couldn't grab digitalData on " + currentPage);
-        	Console.error(err);	
-        });;
-
-        // If HAR downloading is on, download file then turn it off.
-		if( har.on ) {
-			await page.waitFor( 3000 );
-			await har.stop();
-			har.on = false;
-			Console.log(chalk.yellow(">>> HAR file downloaded."));
-		}
-	}
-
-	// Setting up keyboard press bindings for console input
-	/*
-	readline.emitKeypressEvents(process.stdin);
-	process.stdin.setRawMode(true);
-	process.stdin.on('keypress', async (str, key) => {
-	    // Press Ctrl+C to close Node process. Process does not close properly after closing the browser.
-	    if (key && key.ctrl && key.name == 'q') {
-	        if (browser.isConnected()) browser.disconnect();
-	        process.exit(); // eslint-disable-line no-process-exit
-
-        // Press Ctrl+F in the command prompt to run autofill.
-	    // } else if (key && key.ctrl && key.name == 'f') {
-	    //     await page.addScriptTag({ url: autofill }).then(() => {
-	    //         Console.log(chalk.yellow(">>> Running autofill"));
-	    //     }).catch(err => {
-	    //         Console.error(err);
-	    //     });
-	    // Press Ctrl+S to save a screenshot
-	    } else if (key && key.ctrl && key.name == 's') {
-	    	var t = new Date().getTime();
-	    	await page.screenshot({ path: 'screenshot_' + t + '.png'});
-	    	Console.log(chalk.yellow(">>> Took a screenshot at \'screenshot_" + t + ".png\'.")) ;
-	    }
-	});
-	*/
 
 	function getTimestamp() {
 		var date = new Date();
@@ -320,7 +224,7 @@ let roam = async () => {
 	}
 
 	// Generate starting page URL
-	startPage = "https://" + all_env.qa_env + "." + all_env.brand_env+ ".com";//?tealium=" + all_env.tealium_env;
+	//startPage = "https://" + all_env.qa_env + "." + all_env.brand_env+ ".com";//?tealium=" + all_env.tealium_env;
 	//startPage = "https://www.google.com";
 
 
@@ -369,7 +273,16 @@ let roam = async () => {
 
 
 	// Start on starting page
+	console.log(inBrowser);
 	await page.goto(startPage, {waitUntil: 'networkidle0', timeout: 0});
+
+	for( var b = 0; b < inBrowser.execute.length; b++) {
+		await page.evaluate(inBrowser.execute[b]);
+		await page.waitForRequest(req => req.url().indexOf("b/ss/") > -1);
+	}
+	
+	Console.log("Finished inBrowser.execute()");
+
 
 	// Click around wherever you want, and all analytics will be captured.
 	

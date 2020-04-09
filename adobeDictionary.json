@@ -1,0 +1,59 @@
+{
+	"event1" : {
+		"title" : "Checkout Account Login",
+		"desc" : "related to checkout funnel as metrics"
+	},
+	"event2" : {
+		"title" : "Shipping Information",
+		"desc" : "related to checkout funnel as metrics"
+	},
+	"event10" : {
+		"title" : "Tax Amount",
+		"desc" : "$ amount related to tax paid"
+	},
+	"event11" : {
+		"title" : "Potential Units",
+		"desc" : "related to abandonment - abandoned items is this # net of items ordered"
+	},	
+	"event28" : {
+		"title" : "Video Time",
+		"desc" : "related to evar 19 (Video Name)"
+	},
+	"event42" : {
+		"title" : "Quick Buys",
+		"desc" : "quickbuy popup views"
+	},
+	"event52" : {
+		"title" : "Account Created",
+		"desc" : "tracks the number of accounts created"
+	},
+	"event72" : {
+		"title" : "CP Clicks",
+		"desc" : "related to content personalization tracking"
+	},
+	"event103" : {
+		"title" : "Abandon Cart Add",
+		"desc" : "Tracks Cart Share email add"
+	},
+	"event105" : {
+		"title" : "Product List Add",
+		"desc" : "based on query string cm_src=productlist"
+	},
+	"event116" : {
+		"title" : "BOPIS Quantity",
+		"desc" : "Quantity of BOPIS items"
+	},
+	"event137" : {
+		"title" : "WISMO BOPIS",
+		"desc" : "set along with orderID, eVar5"
+	},
+	"event233" : {
+		"title" : "DNS Timing Perf",
+		"desc" : "calculation of domainLookupEnd - domainLookupStart, in milliseconds"
+	},
+	"event251" : {
+		"title" : "SVC Revenue",
+		"desc" : "Captures revenue associated with evar7 Payment Method = SVC, for giftCard/MerchCards"
+	}
+
+}
